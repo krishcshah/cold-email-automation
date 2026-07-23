@@ -33,6 +33,7 @@ model User {
   apiKeys              ApiKey[]
   webhookSubscriptions WebhookSubscription[]
   integrationSettings  IntegrationSetting[]
+  workspaces           Workspace[]
 }
 
 // ─── Email Accounts ──────────────────────────────────────────────────────────
@@ -600,4 +601,81 @@ model IntegrationSetting {
   updatedAt   DateTime @updatedAt
 
   @@unique([userId, provider])
+}
+
+// ─── Workspaces & Agency Mode ────────────────────────────────────────────────
+
+model Workspace {
+  id                     String   @id @default(cuid())
+  ownerId                String
+  owner                  User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name                   String
+  slug                   String   @unique
+  clientName             String?
+  clientEmail            String?
+  sendingCreditsLimit    Int      @default(10000)
+  sendingCreditsUsed     Int      @default(0)
+  enrichmentCreditsLimit Int      @default(500)
+  enrichmentCreditsUsed  Int      @default(0)
+  isAgencyMaster         Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  whiteLabelSetting WhiteLabelSetting?
+  auditLogs         AuditLog[]
+  ipAllowlists      IpAllowlist[]
+  shareableReports  ShareableReport[]
+}
+
+model WhiteLabelSetting {
+  id             String    @id @default(cuid())
+  workspaceId    String    @unique
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customDomain   String?   @unique
+  companyName    String?   @default("OutreachPro")
+  logoUrl        String?
+  faviconUrl     String?
+  primaryColor   String?   @default("#0284c7")
+  supportEmail   String?
+  removeBranding Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+// ─── Shareable Client Reports ────────────────────────────────────────────────
+
+model ShareableReport {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  token       String    @unique @default(cuid())
+  title       String
+  campaignIds String    // CSV of campaign IDs
+  views       Int       @default(0)
+  createdAt   DateTime  @default(now())
+}
+
+// ─── Enterprise Security & Audit Log ───────────────────────────────────────
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actorName   String
+  actorEmail  String
+  ipAddress   String?
+  actionType  String
+  details     String?   @db.Text
+  createdAt   DateTime  @default(now())
+}
+
+model IpAllowlist {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ipAddress   String
+  label       String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([workspaceId, ipAddress])
 }

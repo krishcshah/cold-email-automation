@@ -17,12 +17,16 @@ import {
   Search,
   Plug,
   Key,
+  Building2,
+  FileText,
   LogOut,
   Zap,
 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/agency", label: "Agency Mode", icon: Building2 },
+  { href: "/reports", label: "Client Reports", icon: FileText },
   { href: "/prospecting", label: "B2B Prospect DB", icon: Search },
   { href: "/crm", label: "CRM Pipeline", icon: Kanban },
   { href: "/crm/calls", label: "Call Tasks Queue", icon: PhoneCall },
@@ -34,6 +38,7 @@ const navItems = [
   { href: "/suppression", label: "Suppression & Snippets", icon: ShieldAlert },
   { href: "/integrations", label: "Integrations Hub", icon: Plug },
   { href: "/settings/api", label: "API & Webhooks", icon: Key },
+  { href: "/settings/security", label: "Security & Audit", icon: ShieldCheck },
   { href: "/team", label: "Team Workspace", icon: UserCheck },
 ];
 
@@ -60,7 +65,7 @@ export default function Sidebar() {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive =
-            pathname === item.href || (item.href !== "/crm" && item.href !== "/prospecting" && pathname.startsWith(item.href + "/"));
+            pathname === item.href || (item.href !== "/crm" && item.href !== "/prospecting" && item.href !== "/agency" && pathname.startsWith(item.href + "/"));
           return (
             <Link
               key={item.href}
