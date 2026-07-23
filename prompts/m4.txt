@@ -1,0 +1,54 @@
+Extend the platform with a native B2B lead database, enrichment engine, and deep integrations:
+
+### Features to Add
+
+#### B2B Lead Database
+- Integrate with a leads API (e.g., Hunter.io, Apollo.io API, or Prospeo) to search for leads by:
+  - Job title, seniority, department
+  - Company name, industry, company size
+  - Location (country, city)
+  - Technology stack (company uses HubSpot, Shopify, etc.)
+- Show results in a searchable table
+- Save selected leads directly into a lead list
+- Show lead count and available credits
+
+#### Email Finder & Verifier
+- Find email addresses by entering name + company domain
+- Bulk email finder via CSV (name + domain columns)
+- Email verification: syntax, MX record, SMTP ping, catch-all detection
+- Confidence score per found email
+- Deduplicate leads against existing lists
+
+#### Lead Enrichment
+- Enrich leads with missing data: company size, industry, LinkedIn URL, phone, revenue
+- Use enrichment APIs: Clearbit, Apollo, or similar
+- Waterfall enrichment: try multiple providers, use first successful result
+- Enrichment per-lead and bulk enrichment per list
+
+#### Native Integrations
+- HubSpot: Sync contacts, log email activity, update deal stages
+- Pipedrive: Sync contacts and deals
+- Salesforce: Push leads and log activities
+- Zapier / Make.com: Webhook triggers for all events (email sent, opened, replied, bounced, meeting booked)
+- Slack: Notifications for positive replies and meeting bookings
+- Clay: Accept leads pushed from Clay workflows
+- Google Sheets: Two-way sync with a Google Sheet as a lead source
+
+#### API & Webhooks (Public)
+- Full REST API for all platform features
+- API key management per user
+- Webhook configuration: subscribe to events (email.sent, email.opened, email.replied, email.bounced, lead.unsubscribed, meeting.booked)
+- Webhook retry logic with exponential backoff
+- API documentation (Swagger/OpenAPI spec auto-generated)
+
+---
+
+## 🎯 Golden Rules for Every Milestone
+
+1. **Every feature must be functional** — no placeholders, no fake UI, no lorem ipsum
+2. **Multi-tenant from Day 1** — all data is scoped to the user/workspace
+3. **Background jobs for everything async** — email sending, warmup, enrichment all run in queues
+4. **Proper error states** — every action has a loading, success, and error state in the UI
+5. **Mobile responsive** — every screen must work on mobile
+6. **Rate limiting** — protect all API endpoints
+7. **Logging** — log all email events (sent, opened, bounced, replied) with timestamps to the database

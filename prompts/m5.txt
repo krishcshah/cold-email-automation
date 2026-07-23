@@ -1,0 +1,47 @@
+Extend the platform with full agency and white-label capabilities:
+
+### Features to Add
+
+#### Multi-Workspace (Agency Mode)
+- Create and manage multiple client workspaces from a single agency dashboard
+- Each client workspace is fully isolated (leads, campaigns, inboxes, analytics)
+- Invite clients to their own workspace with restricted access
+- Agency can shadow any client workspace
+- Transfer campaigns and lead lists between workspaces
+
+#### White Labeling
+- Custom domain: host the platform under client's domain (e.g., app.clientagency.com)
+- Custom branding: logo, primary color, favicon, email footer branding
+- Remove all references to the underlying platform
+- Custom "From" in system emails (e.g., support@clientagency.com)
+- White-labeled client login page
+
+#### Client Reporting
+- Shareable campaign reports (read-only link for clients)
+- Automated weekly/monthly PDF report generation per client
+- Report includes: emails sent, open rate, reply rate, meetings booked, ROI estimate
+- Custom report branding (client logo + agency logo)
+
+#### Billing & Credits (Agency)
+- Allocate sending credits (emails/month) per client workspace
+- Allocate lead database credits per client
+- Track credit usage per client in real time
+- Block campaigns when client exceeds credit limit
+
+#### User Management
+- SSO support (Google OAuth, SAML for enterprise)
+- 2FA (TOTP authenticator app)
+- Audit log: full log of all user actions with timestamp, IP, and action type
+- IP allowlisting per workspace
+
+---
+
+## 🎯 Golden Rules for Every Milestone
+
+1. **Every feature must be functional** — no placeholders, no fake UI, no lorem ipsum
+2. **Multi-tenant from Day 1** — all data is scoped to the user/workspace
+3. **Background jobs for everything async** — email sending, warmup, enrichment all run in queues
+4. **Proper error states** — every action has a loading, success, and error state in the UI
+5. **Mobile responsive** — every screen must work on mobile
+6. **Rate limiting** — protect all API endpoints
+7. **Logging** — log all email events (sent, opened, bounced, replied) with timestamps to the database

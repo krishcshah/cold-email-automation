@@ -1,0 +1,40 @@
+Extend the platform with AI-powered personalization and advanced campaign sequencing:
+
+### Features to Add
+
+#### AI Email Writing
+- AI subject line generator: input campaign goal + persona, get 5 subject line variants
+- AI body writer: generate personalized email body based on lead's company, title, and goal
+- AI spintax generator: create {variant1|variant2|variant3} spin variations for natural-sounding bulk sends
+- AI opening line generator: generate unique first lines per lead using their name/company/title
+- AI icebreaker: generate unique personalized icebreakers by scraping/reading lead's LinkedIn summary or company website
+
+#### Variable System (Advanced)
+- Support all CSV column values as {{variables}} in subject and body
+- Conditional variables: {{first_name | "there"}} (fallback if field is empty)
+- Dynamic snippets: reusable text blocks insertable into any email template
+
+#### Advanced Sequence Logic
+- Condition-based branching: if lead opens email → send follow-up A; if not → send follow-up B
+- Reply-based stopping: auto-stop sequence when lead replies (this must already exist, but make it bulletproof)
+- Click-triggered branches: if lead clicks link → trigger a different sub-sequence
+- Out-of-office detection: pause sequence for leads who auto-reply with OOO, resume after their return date
+- A/B testing per step: test multiple subject lines or bodies, track winner, auto-stop losers
+- Sequence pause rules: global suppression list, company domain suppression
+
+#### Personalized Assets
+- Dynamic image personalization: embed lead's name/company into images (like lemlist)
+- Personalized landing page per lead: generate a unique URL with lead's name/company pre-filled
+- Video thumbnail personalization: add lead's name overlay on video thumbnail images
+
+---
+
+## 🎯 Golden Rules for Every Milestone
+
+1. **Every feature must be functional** — no placeholders, no fake UI, no lorem ipsum
+2. **Multi-tenant from Day 1** — all data is scoped to the user/workspace
+3. **Background jobs for everything async** — email sending, warmup, enrichment all run in queues
+4. **Proper error states** — every action has a loading, success, and error state in the UI
+5. **Mobile responsive** — every screen must work on mobile
+6. **Rate limiting** — protect all API endpoints
+7. **Logging** — log all email events (sent, opened, bounced, replied) with timestamps to the database

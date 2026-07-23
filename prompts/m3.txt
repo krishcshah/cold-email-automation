@@ -1,0 +1,49 @@
+Extend the platform with multichannel outreach capabilities and a built-in CRM:
+
+### Features to Add
+
+#### LinkedIn Outreach (via Browser Automation)
+- LinkedIn connection request step in sequences
+- LinkedIn message step in sequences
+- LinkedIn profile view step (engagement signal)
+- Safety limits: respect LinkedIn daily limits
+- Cookie-based LinkedIn session auth
+
+#### SMS / WhatsApp Outreach
+- Add Twilio integration for SMS steps in sequences
+- SMS template with {{variables}}
+- Track SMS delivery and replies
+
+#### Call Tasks
+- Add "Call" task steps in sequences
+- Show call task queue: list of leads to call today
+- Log call outcome: connected / voicemail / no answer
+- Auto-advance sequence based on call outcome
+
+#### Built-in CRM
+- Leads automatically become "Contacts" when they reply
+- Contact profile: full timeline of all touchpoints (emails sent/opened/replied, LinkedIn messages, calls)
+- Pipeline view (Kanban): stages like New Lead → Contacted → Interested → Meeting Booked → Closed Won / Lost
+- Deal value field per contact
+- Notes and tasks per contact
+- Company-level grouping: see all contacts from the same company
+- Tag system: label contacts for filtering and segmentation
+- Bulk actions: move stage, add tag, assign to team member
+
+#### Team Collaboration
+- Invite team members to workspace
+- Role-based permissions: Admin / Member / Viewer
+- Assign campaigns and leads to specific team members
+- Activity feed: see what teammates are doing
+
+---
+
+## 🎯 Golden Rules for Every Milestone
+
+1. **Every feature must be functional** — no placeholders, no fake UI, no lorem ipsum
+2. **Multi-tenant from Day 1** — all data is scoped to the user/workspace
+3. **Background jobs for everything async** — email sending, warmup, enrichment all run in queues
+4. **Proper error states** — every action has a loading, success, and error state in the UI
+5. **Mobile responsive** — every screen must work on mobile
+6. **Rate limiting** — protect all API endpoints
+7. **Logging** — log all email events (sent, opened, bounced, replied) with timestamps to the database
