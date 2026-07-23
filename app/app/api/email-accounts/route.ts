@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       fromName, fromEmail, smtpHost, smtpPort, smtpUser, smtpPass,
-      imapHost, imapPort, imapUser, imapPass,
+      imapHost, imapPort, imapUser, imapPass, customDomain,
     } = body;
 
     if (!fromName || !fromEmail || !smtpHost || !smtpPort || !smtpUser || !smtpPass) {
@@ -51,13 +51,15 @@ export async function POST(req: NextRequest) {
         imapPort: imapPort ? Number(imapPort) : null,
         imapUser: imapUser || null,
         imapPass: imapPass ? encrypt(imapPass) : null,
+        customDomain: customDomain || null,
         status: "untested",
       },
     });
 
     return apiSuccess({ id: account.id }, 201);
-  } catch (err) {
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : "Failed to create account";
     console.error("Create email account error:", err);
-    return apiError("Failed to create account", 500);
+    return apiError(errMsg, 500);
   }
 }

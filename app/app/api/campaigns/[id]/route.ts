@@ -38,17 +38,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   });
   if (!campaign) return apiError("Campaign not found", 404);
 
-  // Only allow editing draft campaigns
-  if (campaign.status !== "draft") {
-    return apiError("Only draft campaigns can be edited");
-  }
-
   const body = await req.json();
   const {
     name, leadListIds, senderIds, steps,
     dailyLimit, minDelaySecs, maxDelaySecs,
     sendDays, sendStartHour, sendEndHour, timezone,
     trackOpens, trackClicks,
+    // ReachInbox Options
+    stopOnReply, stopOnDomainReply, bounceProtection, bounceThreshold,
+    smartTimeGaps, maxNewLeadsPerDay, prioritizeNewLeads, autoOptimizeAZ,
+    insertUnsubscribeHeader, unsubscribeBehavior, aiReplyAgentEnabled,
+    textOnlyDelivery, providerMatching, strictProviderMatching, targetProviders,
+    includeBlockquotes, positiveReplyNotification, notificationEmail,
+    automatedOooReschedule, prospectValue, tags, ccEmails, bccEmails,
   } = body;
 
   // Update in a transaction
@@ -66,6 +68,32 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         timezone: timezone ?? campaign.timezone,
         trackOpens: trackOpens ?? campaign.trackOpens,
         trackClicks: trackClicks ?? campaign.trackClicks,
+
+        stopOnReply: stopOnReply ?? campaign.stopOnReply,
+        stopOnDomainReply: stopOnDomainReply ?? campaign.stopOnDomainReply,
+        bounceProtection: bounceProtection ?? campaign.bounceProtection,
+        bounceThreshold: bounceThreshold ?? campaign.bounceThreshold,
+        smartTimeGaps: smartTimeGaps ?? campaign.smartTimeGaps,
+        maxNewLeadsPerDay: maxNewLeadsPerDay ?? campaign.maxNewLeadsPerDay,
+        prioritizeNewLeads: prioritizeNewLeads ?? campaign.prioritizeNewLeads,
+        autoOptimizeAZ: autoOptimizeAZ ?? campaign.autoOptimizeAZ,
+        insertUnsubscribeHeader: insertUnsubscribeHeader ?? campaign.insertUnsubscribeHeader,
+        unsubscribeBehavior: unsubscribeBehavior ?? campaign.unsubscribeBehavior,
+
+        aiReplyAgentEnabled: aiReplyAgentEnabled ?? campaign.aiReplyAgentEnabled,
+        textOnlyDelivery: textOnlyDelivery ?? campaign.textOnlyDelivery,
+        providerMatching: providerMatching ?? campaign.providerMatching,
+        strictProviderMatching: strictProviderMatching ?? campaign.strictProviderMatching,
+        targetProviders: Array.isArray(targetProviders) ? targetProviders.join(",") : (targetProviders ?? campaign.targetProviders),
+        includeBlockquotes: includeBlockquotes ?? campaign.includeBlockquotes,
+        positiveReplyNotification: positiveReplyNotification ?? campaign.positiveReplyNotification,
+        notificationEmail: notificationEmail ?? campaign.notificationEmail,
+        automatedOooReschedule: automatedOooReschedule ?? campaign.automatedOooReschedule,
+        prospectValue: prospectValue ? Number(prospectValue) : campaign.prospectValue,
+
+        tags: tags ?? campaign.tags,
+        ccEmails: ccEmails ?? campaign.ccEmails,
+        bccEmails: bccEmails ?? campaign.bccEmails,
       },
     });
 

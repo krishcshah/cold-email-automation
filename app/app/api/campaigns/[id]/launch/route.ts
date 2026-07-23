@@ -3,8 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth, apiError, apiSuccess } from "@/lib/api";
 import { Client } from "@upstash/qstash";
 
-const qstash = new Client({ token: process.env.QSTASH_TOKEN! });
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL!;
+const qstashToken = process.env.QSTASH_TOKEN;
+const qstash = qstashToken ? new Client({ token: qstashToken }) : null;
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 // POST /api/campaigns/[id]/launch
 export async function POST(
@@ -26,12 +27,11 @@ export async function POST(
   });
 
   if (!campaign) return apiError("Campaign not found", 404);
-  if (campaign.status === "active") return apiError("Campaign is already active");
   if (campaign.sequenceSteps.length === 0) return apiError("Add at least one email step before launching");
   if (campaign.campaignSenders.length === 0) return apiError("Add at least one sender account before launching");
   if (campaign.campaignLeadLists.length === 0) return apiError("Add at least one lead list before launching");
 
-  // Collect all leads across all lists
+  // Collect all active leads across all selected lists
   const allLeads = campaign.campaignLeadLists.flatMap((cl) =>
     cl.leadList.leads.filter((l) => l.status === "active")
   );
@@ -58,22 +58,35 @@ export async function POST(
     });
   }
 
-  // Update campaign status
+  // Update campaign status to active
   await prisma.campaign.update({
     where: { id: campaign.id },
     data: { status: "active" },
   });
 
-  // Enqueue the first batch via QStash
-  // The send-email worker will handle step progression
-  await qstash.publishJSON({
-    url: `${APP_URL}/api/jobs/process-campaign`,
-    body: { campaignId: campaign.id },
-    delay: 5, // 5 seconds before first job runs
-  });
+  // Enqueue job via QStash or direct local background fetch fallback
+  try {
+    if (qstash && qstashToken) {
+      await qstash.publishJSON({
+        url: `${APP_URL}/api/jobs/process-campaign`,
+        body: { campaignId: campaign.id },
+        delay: 2,
+      });
+    } else {
+      // Local fallback: Trigger process-campaign endpoint directly in background
+      fetch(`${APP_URL}/api/jobs/process-campaign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaignId: campaign.id }),
+      }).catch((err) => console.error("Local background job trigger failed:", err));
+    }
+  } catch (queueErr) {
+    console.warn("Queue trigger warning (proceeding with campaign launch):", queueErr);
+  }
 
   return apiSuccess({
     launched: true,
+    status: "active",
     leadsEnrolled: newLeads.length,
     totalLeads: allLeads.length,
   });

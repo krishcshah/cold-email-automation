@@ -135,6 +135,33 @@ model Campaign {
   trackOpens    Boolean @default(true)
   trackClicks   Boolean @default(true)
 
+  // ReachInbox Campaign Options
+  stopOnReply               Boolean  @default(true)
+  stopOnDomainReply         Boolean  @default(false)
+  bounceProtection          Boolean  @default(true)
+  bounceThreshold           Int      @default(10)
+  smartTimeGaps             Boolean  @default(true)
+  maxNewLeadsPerDay         Int      @default(500)
+  prioritizeNewLeads        Boolean  @default(false)
+  autoOptimizeAZ            Boolean  @default(false)
+  insertUnsubscribeHeader   Boolean  @default(true)
+  unsubscribeBehavior       String   @default("all") // "current" | "all"
+
+  aiReplyAgentEnabled       Boolean  @default(false)
+  textOnlyDelivery          Boolean  @default(false)
+  providerMatching          Boolean  @default(false)
+  strictProviderMatching    Boolean  @default(false)
+  targetProviders           String   @default("google,outlook,others")
+  includeBlockquotes        Boolean  @default(true)
+  positiveReplyNotification Boolean  @default(false)
+  notificationEmail         String?
+  automatedOooReschedule    Boolean  @default(true)
+  prospectValue             Float    @default(500)
+
+  tags                      String?
+  ccEmails                  String?
+  bccEmails                 String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

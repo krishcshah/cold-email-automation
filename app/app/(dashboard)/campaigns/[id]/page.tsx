@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Play, Pause, Square } from "lucide-react";
+import ReachInboxOptions, { ReachInboxOptionsState } from "@/components/campaign/ReachInboxOptions";
 
 interface CampaignAnalytics {
   sent: number; opened: number; clicked: number;
@@ -20,6 +21,30 @@ interface Campaign {
   id: string; name: string; status: string;
   sequenceSteps: { stepNumber: number; subject: string; delayDays: number }[];
   campaignLeadLists: { leadList: { name: string } }[];
+  // Options
+  stopOnReply: boolean;
+  stopOnDomainReply: boolean;
+  bounceProtection: boolean;
+  bounceThreshold: number;
+  smartTimeGaps: boolean;
+  maxNewLeadsPerDay: number;
+  prioritizeNewLeads: boolean;
+  autoOptimizeAZ: boolean;
+  insertUnsubscribeHeader: boolean;
+  unsubscribeBehavior: "current" | "all";
+  aiReplyAgentEnabled: boolean;
+  textOnlyDelivery: boolean;
+  providerMatching: boolean;
+  strictProviderMatching: boolean;
+  targetProviders: string | string[];
+  includeBlockquotes: boolean;
+  positiveReplyNotification: boolean;
+  notificationEmail: string | null;
+  automatedOooReschedule: boolean;
+  prospectValue: number;
+  tags: string | null;
+  ccEmails: string | null;
+  bccEmails: string | null;
 }
 
 const STATUS_CLASSES: Record<string, string> = {
@@ -46,7 +71,10 @@ export default function CampaignDetailPage() {
   const [leadStates, setLeadStates] = useState<LeadState[]>([]);
   const [stateTotal, setStateTotal] = useState(0);
   const [actionLoading, setActionLoading] = useState(false);
-  const [tab, setTab] = useState<"analytics" | "leads">("analytics");
+  const [savingOptions, setSavingOptions] = useState(false);
+  const [tab, setTab] = useState<"analytics" | "leads" | "sequences" | "schedule" | "options">("analytics");
+
+  const [reachInboxOpts, setReachInboxOpts] = useState<ReachInboxOptionsState | null>(null);
 
   const load = useCallback(async () => {
     const [cRes, aRes, lRes] = await Promise.all([
@@ -59,6 +87,38 @@ export default function CampaignDetailPage() {
     setAnalytics(a);
     setLeadStates(l.states ?? []);
     setStateTotal(l.total ?? 0);
+
+    if (c) {
+      const providersArr = typeof c.targetProviders === "string"
+        ? c.targetProviders.split(",")
+        : (c.targetProviders || ["google", "outlook", "others"]);
+
+      setReachInboxOpts({
+        stopOnReply: c.stopOnReply ?? true,
+        stopOnDomainReply: c.stopOnDomainReply ?? false,
+        bounceProtection: c.bounceProtection ?? true,
+        bounceThreshold: c.bounceThreshold ?? 10,
+        smartTimeGaps: c.smartTimeGaps ?? true,
+        maxNewLeadsPerDay: c.maxNewLeadsPerDay ?? 500,
+        prioritizeNewLeads: c.prioritizeNewLeads ?? false,
+        autoOptimizeAZ: c.autoOptimizeAZ ?? false,
+        insertUnsubscribeHeader: c.insertUnsubscribeHeader ?? true,
+        unsubscribeBehavior: (c.unsubscribeBehavior as "current" | "all") || "all",
+        aiReplyAgentEnabled: c.aiReplyAgentEnabled ?? false,
+        textOnlyDelivery: c.textOnlyDelivery ?? false,
+        providerMatching: c.providerMatching ?? false,
+        strictProviderMatching: c.strictProviderMatching ?? false,
+        targetProviders: providersArr,
+        includeBlockquotes: c.includeBlockquotes ?? true,
+        positiveReplyNotification: c.positiveReplyNotification ?? false,
+        notificationEmail: c.notificationEmail || "",
+        automatedOooReschedule: c.automatedOooReschedule ?? true,
+        prospectValue: c.prospectValue ?? 500,
+        tags: c.tags || "",
+        ccEmails: c.ccEmails || "",
+        bccEmails: c.bccEmails || "",
+      });
+    }
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
@@ -68,6 +128,18 @@ export default function CampaignDetailPage() {
     await fetch(`/api/campaigns/${id}/${action}`, { method: "POST" });
     await load();
     setActionLoading(false);
+  }
+
+  async function handleSaveOptions() {
+    if (!reachInboxOpts) return;
+    setSavingOptions(true);
+    await fetch(`/api/campaigns/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(reachInboxOpts),
+    });
+    setSavingOptions(false);
+    await load();
   }
 
   if (!campaign) {
@@ -110,7 +182,7 @@ export default function CampaignDetailPage() {
           )}
           {campaign.status === "paused" && (
             <button onClick={() => doAction("resume")} disabled={actionLoading} className="flex items-center gap-1.5 bg-primary/20 hover:bg-primary/30 text-primary px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-50">
-              <Play className="w-3.5 h-3.5" /> Resume
+              <Play className="w-3.5 h-3.5" /> Resume Campaign
             </button>
           )}
           {(campaign.status === "active" || campaign.status === "paused") && (
@@ -121,7 +193,7 @@ export default function CampaignDetailPage() {
         </div>
       </div>
 
-      {/* Analytics */}
+      {/* Analytics Summary Banner */}
       {analytics && (
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
           <StatPill label="Total Leads" value={analytics.totalLeads} color="glass text-foreground" />
@@ -134,22 +206,54 @@ export default function CampaignDetailPage() {
         </div>
       )}
 
-      {/* Tabs */}
+      {/* Main Campaign Management Tabs */}
       <div>
-        <div className="flex border-b border-border mb-4 gap-1">
-          {(["analytics", "leads"] as const).map((t) => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-2.5 text-sm font-medium capitalize border-b-2 transition-colors ${tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+        <div className="flex border-b border-border mb-4 gap-2">
+          {(["analytics", "leads", "sequences", "schedule", "options"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-5 py-2.5 text-sm font-semibold capitalize border-b-2 transition-colors ${
+                tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
             >
-              {t === "analytics" ? "Sequence" : `Leads (${stateTotal})`}
+              {t === "analytics"
+                ? "Analytics"
+                : t === "leads"
+                ? `Leads (${stateTotal})`
+                : t === "sequences"
+                ? "Sequences"
+                : t === "schedule"
+                ? "Schedule"
+                : "Options"}
             </button>
           ))}
         </div>
 
-        {tab === "analytics" && (
+        {tab === "analytics" && analytics && (
+          <div className="glass rounded-xl p-6 space-y-6">
+            <h3 className="text-base font-bold text-foreground">Campaign Analytics Overview</h3>
+            <div className="grid grid-cols-3 gap-6">
+              <div className="p-5 rounded-xl bg-secondary/30 border border-border">
+                <p className="text-xs text-muted-foreground uppercase font-semibold">Leads Contacted</p>
+                <p className="text-3xl font-extrabold text-foreground mt-1">{analytics.sent}</p>
+              </div>
+              <div className="p-5 rounded-xl bg-secondary/30 border border-border">
+                <p className="text-xs text-muted-foreground uppercase font-semibold">Open Rate</p>
+                <p className="text-3xl font-extrabold text-amber-400 mt-1">{analytics.openRate}%</p>
+              </div>
+              <div className="p-5 rounded-xl bg-secondary/30 border border-border">
+                <p className="text-xs text-muted-foreground uppercase font-semibold">Reply Rate</p>
+                <p className="text-3xl font-extrabold text-emerald-400 mt-1">{analytics.replyRate}%</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "sequences" && (
           <div className="glass rounded-xl overflow-hidden">
             <div className="px-5 py-4 border-b border-border">
-              <h2 className="font-semibold text-foreground">Email Sequence</h2>
+              <h2 className="font-semibold text-foreground">Email Sequence Steps</h2>
             </div>
             <div className="p-5 space-y-3">
               {campaign.sequenceSteps.map((step, i) => (
@@ -182,7 +286,7 @@ export default function CampaignDetailPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Lead</th>
+                  <th>Lead Email</th>
                   <th>Company</th>
                   <th>Step</th>
                   <th>Status</th>
@@ -221,6 +325,15 @@ export default function CampaignDetailPage() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {tab === "options" && reachInboxOpts && (
+          <ReachInboxOptions
+            options={reachInboxOpts}
+            onChange={(updated) => setReachInboxOpts(updated)}
+            onSave={handleSaveOptions}
+            isSaving={savingOptions}
+          />
         )}
       </div>
     </div>

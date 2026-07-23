@@ -7,8 +7,9 @@ import { resolveSpintax } from "@/lib/email/spintax";
 import { Client } from "@upstash/qstash";
 import crypto from "crypto";
 
-const qstash = new Client({ token: process.env.QSTASH_TOKEN! });
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL!;
+const qstashToken = process.env.QSTASH_TOKEN;
+const qstash = qstashToken ? new Client({ token: qstashToken }) : null;
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 interface JobPayload {
   campaignId: string;
@@ -65,22 +66,26 @@ export async function POST(req: NextRequest) {
   const now = new Date();
   const hour = now.getUTCHours();
   if (hour < campaign.sendStartHour || hour >= campaign.sendEndHour) {
-    await qstash.publishJSON({
-      url: `${APP_URL}/api/jobs/process-campaign`,
-      body: { campaignId },
-      delay: 3600,
-    });
+    if (qstash) {
+      await qstash.publishJSON({
+        url: `${APP_URL}/api/jobs/process-campaign`,
+        body: { campaignId },
+        delay: 3600,
+      }).catch(console.error);
+    }
     return NextResponse.json({ skipped: true, reason: "outside_send_window" });
   }
 
   const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
   const allowedDays = campaign.sendDays.split(",").map(Number);
   if (!allowedDays.includes(dayOfWeek)) {
-    await qstash.publishJSON({
-      url: `${APP_URL}/api/jobs/process-campaign`,
-      body: { campaignId },
-      delay: 3600 * 12,
-    });
+    if (qstash) {
+      await qstash.publishJSON({
+        url: `${APP_URL}/api/jobs/process-campaign`,
+        body: { campaignId },
+        delay: 3600 * 12,
+      }).catch(console.error);
+    }
     return NextResponse.json({ skipped: true, reason: "wrong_day" });
   }
 
@@ -190,8 +195,7 @@ export async function POST(req: NextRequest) {
       let stepBody = step.body;
       let selectedVariant: typeof step.variants[0] | null = null;
 
-      if (step.variants.length > 0) {
-        // Alternate between variants
+      if (step.variants && step.variants.length > 0) {
         const variantIndex = state.id.charCodeAt(state.id.length - 1) % (step.variants.length + 1);
         if (variantIndex < step.variants.length) {
           selectedVariant = step.variants[variantIndex];
@@ -298,12 +302,12 @@ export async function POST(req: NextRequest) {
     where: { campaignId, status: "active" },
   });
 
-  if (remaining > 0) {
+  if (remaining > 0 && qstash) {
     await qstash.publishJSON({
       url: `${APP_URL}/api/jobs/process-campaign`,
       body: { campaignId },
       delay: 120,
-    });
+    }).catch(console.error);
   }
 
   return NextResponse.json({ processed: emailsSentThisRun, remaining });

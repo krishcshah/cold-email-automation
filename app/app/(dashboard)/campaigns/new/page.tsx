@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ShieldCheck, Check } from "lucide-react";
 import { checkSpamScore, SpamCheckResult } from "@/lib/deliverability/spamChecker";
+import ReachInboxOptions, { ReachInboxOptionsState } from "@/components/campaign/ReachInboxOptions";
 
 interface SequenceStep {
   subject: string;
@@ -22,6 +23,32 @@ const TIMEZONES = [
   "Europe/London", "Europe/Paris", "Europe/Berlin", "Asia/Tokyo", "Asia/Singapore",
   "Australia/Sydney",
 ];
+
+const DEFAULT_OPTIONS: ReachInboxOptionsState = {
+  stopOnReply: true,
+  stopOnDomainReply: false,
+  bounceProtection: true,
+  bounceThreshold: 10,
+  smartTimeGaps: true,
+  maxNewLeadsPerDay: 500,
+  prioritizeNewLeads: false,
+  autoOptimizeAZ: false,
+  insertUnsubscribeHeader: true,
+  unsubscribeBehavior: "all",
+  aiReplyAgentEnabled: false,
+  textOnlyDelivery: false,
+  providerMatching: false,
+  strictProviderMatching: false,
+  targetProviders: ["google", "outlook", "others"],
+  includeBlockquotes: true,
+  positiveReplyNotification: false,
+  notificationEmail: "",
+  automatedOooReschedule: true,
+  prospectValue: 500,
+  tags: "",
+  ccEmails: "",
+  bccEmails: "",
+};
 
 export default function NewCampaignPage() {
   const router = useRouter();
@@ -43,13 +70,15 @@ export default function NewCampaignPage() {
     { subject: "", body: "", delayDays: 0, condition: "always" },
   ]);
 
+  const [reachInboxOpts, setReachInboxOpts] = useState<ReachInboxOptionsState>(DEFAULT_OPTIONS);
+
   const [availableLists, setAvailableLists] = useState<LeadList[]>([]);
   const [availableSenders, setAvailableSenders] = useState<EmailAccount[]>([]);
   const [activeStep, setActiveStep] = useState(0);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"sequence" | "settings">("sequence");
+  const [tab, setTab] = useState<"sequence" | "schedule" | "options">("sequence");
 
   // Live Spam Score Check
   const [spamCheck, setSpamCheck] = useState<SpamCheckResult | null>(null);
@@ -139,6 +168,7 @@ export default function NewCampaignPage() {
         trackClicks,
         sendSchedule,
         steps,
+        ...reachInboxOpts,
       }),
     });
 
@@ -155,7 +185,7 @@ export default function NewCampaignPage() {
   const currentStep = steps[activeStep];
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6 max-w-6xl">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -164,15 +194,16 @@ export default function NewCampaignPage() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Create Campaign</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">Build multi-step cold email sequence</p>
+            <p className="text-muted-foreground text-sm mt-0.5">Build sequence, schedule, and ReachInbox campaign options</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => router.back()} className="border border-border text-muted-foreground hover:text-foreground text-sm px-4 py-2 rounded-lg transition-colors">
             Cancel
           </button>
-          <button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold px-5 py-2.5 rounded-lg transition-all disabled:opacity-50">
-            {saving ? "Creating..." : "Save & Continue →"}
+          <button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold px-5 py-2.5 rounded-lg transition-all disabled:opacity-50 flex items-center gap-2">
+            <Check className="w-4 h-4" />
+            {saving ? "Launching..." : "Save & Launch Campaign →"}
           </button>
         </div>
       </div>
@@ -185,7 +216,7 @@ export default function NewCampaignPage() {
       <div className="glass rounded-xl p-6 grid grid-cols-3 gap-4">
         <div className="col-span-1">
           <label className={labelClass}>Campaign Name *</label>
-          <input className={inputClass} placeholder="e.g. Q1 SaaS Founders Outreach" value={name} onChange={e => setName(e.target.value)} />
+          <input className={inputClass} placeholder="e.g. IT COMPANIES" value={name} onChange={e => setName(e.target.value)} />
         </div>
         <div>
           <label className={labelClass}>Lead List *</label>
@@ -216,17 +247,20 @@ export default function NewCampaignPage() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Main Campaign Tabs */}
       <div className="flex border-b border-border">
-        <button onClick={() => setTab("sequence")} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === "sequence" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-          Sequence Builder ({steps.length} Steps)
+        <button onClick={() => setTab("sequence")} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${tab === "sequence" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+          Sequences ({steps.length})
         </button>
-        <button onClick={() => setTab("settings")} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === "settings" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-          Sending Settings & Schedule
+        <button onClick={() => setTab("schedule")} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${tab === "schedule" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+          Schedule
+        </button>
+        <button onClick={() => setTab("options")} className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${tab === "options" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+          Options
         </button>
       </div>
 
-      {/* Sequence Builder */}
+      {/* Tab Content: Sequences */}
       {tab === "sequence" && (
         <div className="grid grid-cols-4 gap-6">
           {/* Step list sidebar */}
@@ -309,8 +343,8 @@ export default function NewCampaignPage() {
         </div>
       )}
 
-      {/* Sending Settings */}
-      {tab === "settings" && (
+      {/* Tab Content: Schedule */}
+      {tab === "schedule" && (
         <div className="glass rounded-xl p-6 space-y-6">
           <div className="grid grid-cols-2 gap-6">
             <div>
@@ -356,6 +390,14 @@ export default function NewCampaignPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Tab Content: Options (ReachInbox Options) */}
+      {tab === "options" && (
+        <ReachInboxOptions
+          options={reachInboxOpts}
+          onChange={(updated) => setReachInboxOpts(updated)}
+        />
       )}
     </div>
   );
