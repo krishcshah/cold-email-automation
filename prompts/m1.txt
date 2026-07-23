@@ -1,0 +1,44 @@
+Extend the cold email platform with a full email deliverability and warmup system:
+
+### Features to Add
+
+#### Email Warmup
+- Each connected email account gets an automated warmup process
+- Warmup pool: simulate a network of internal "warmup" email accounts that send and reply to each other
+- Configurable warmup settings per account:
+  - Warmup emails per day (start low, ramp up over 30 days)
+  - Reply rate percentage (default 30–40%)
+  - Mark as important percentage
+  - Rescue from spam percentage
+- Warmup dashboard: show health score (0–100), daily activity graph, inbox placement rate
+- Warmup schedule: ramp-up curve (linear, exponential)
+- Enable/disable warmup per account
+
+#### Inbox Rotation
+- When a campaign has multiple sender accounts, distribute emails across them automatically
+- Smart rotation: prefer accounts with lower daily send count
+- ESP (Email Service Provider) matching: detect if recipient is on Gmail/Outlook and prefer sending from a matching provider
+
+#### Deliverability Tools
+- Spam score checker: run email content through SpamAssassin-style scoring before sending
+- Blacklist monitor: check sending domains against major DNS blacklists (DNSBL)
+- Inbox placement test: send test emails to seed accounts and report Gmail/Outlook/Yahoo inbox vs spam placement
+- DNS health check for connected domains: SPF, DKIM, DMARC validation
+- Custom tracking domain: allow users to set their own domain for open/click tracking pixels
+
+#### Email Validation
+- Validate lead email addresses before sending (MX record check + syntax check)
+- Mark invalid emails and skip them in campaigns
+- Show validation stats per lead list
+
+---
+
+## 🎯 Golden Rules for Every Milestone
+
+1. **Every feature must be functional** — no placeholders, no fake UI, no lorem ipsum
+2. **Multi-tenant from Day 1** — all data is scoped to the user/workspace
+3. **Background jobs for everything async** — email sending, warmup, enrichment all run in queues
+4. **Proper error states** — every action has a loading, success, and error state in the UI
+5. **Mobile responsive** — every screen must work on mobile
+6. **Rate limiting** — protect all API endpoints
+7. **Logging** — log all email events (sent, opened, bounced, replied) with timestamps to the database
