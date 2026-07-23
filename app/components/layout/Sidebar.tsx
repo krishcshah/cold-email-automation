@@ -19,12 +19,16 @@ import {
   Key,
   Building2,
   FileText,
+  Bot,
+  BarChart3,
   LogOut,
   Zap,
 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/inbox/autopilot", label: "AI Autopilot Inbox", icon: Bot },
+  { href: "/analytics", label: "Advanced Analytics", icon: BarChart3 },
   { href: "/agency", label: "Agency Mode", icon: Building2 },
   { href: "/reports", label: "Client Reports", icon: FileText },
   { href: "/prospecting", label: "B2B Prospect DB", icon: Search },
@@ -38,6 +42,7 @@ const navItems = [
   { href: "/suppression", label: "Suppression & Snippets", icon: ShieldAlert },
   { href: "/integrations", label: "Integrations Hub", icon: Plug },
   { href: "/settings/api", label: "API & Webhooks", icon: Key },
+  { href: "/settings/enterprise", label: "Enterprise & GDPR", icon: ShieldCheck },
   { href: "/settings/security", label: "Security & Audit", icon: ShieldCheck },
   { href: "/team", label: "Team Workspace", icon: UserCheck },
 ];
