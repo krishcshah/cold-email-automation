@@ -23,7 +23,7 @@ export async function GET() {
   );
 }
 
-// POST /api/leads — create lead list + import leads from JSON
+// POST /api/leads — create lead list + import leads with flexible mapping
 export async function POST(req: NextRequest) {
   const { userId, error } = await requireAuth();
   if (error) return error;
@@ -32,7 +32,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { name, leads } = body as {
       name: string;
-      leads: Record<string, string>[];
+      leads: Array<{
+        email: string;
+        firstName?: string;
+        lastName?: string;
+        company?: string;
+        title?: string;
+        phone?: string;
+        website?: string;
+        customFields?: Record<string, string>;
+      }>;
     };
 
     if (!name) return apiError("List name is required");
@@ -41,32 +50,17 @@ export async function POST(req: NextRequest) {
     const list = await prisma.leadList.create({ data: { userId, name } });
 
     await prisma.lead.createMany({
-      data: leads.map((row) => {
-        const {
-          email = "",
-          first_name,
-          last_name,
-          company,
-          title,
-          phone,
-          website,
-          ...rest
-        } = row;
-
-        const customFields = Object.keys(rest).length > 0 ? rest : undefined;
-
-        return {
-          leadListId: list.id,
-          email,
-          firstName: first_name ?? undefined,
-          lastName: last_name ?? undefined,
-          company: company ?? undefined,
-          title: title ?? undefined,
-          phone: phone ?? undefined,
-          website: website ?? undefined,
-          customFields,
-        };
-      }),
+      data: leads.map((item) => ({
+        leadListId: list.id,
+        email: item.email || "unspecified@domain.com",
+        firstName: item.firstName || undefined,
+        lastName: item.lastName || undefined,
+        company: item.company || undefined,
+        title: item.title || undefined,
+        phone: item.phone || undefined,
+        website: item.website || undefined,
+        customFields: item.customFields && Object.keys(item.customFields).length > 0 ? item.customFields : undefined,
+      })),
     });
 
     return apiSuccess({ id: list.id, name: list.name }, 201);

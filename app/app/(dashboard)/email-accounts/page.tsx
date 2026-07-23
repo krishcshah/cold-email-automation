@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Mail, Plus, Trash2, TestTube, Upload, CheckCircle, XCircle, Clock, Flame } from "lucide-react";
+import { Mail, Plus, Trash2, TestTube, Upload, CheckCircle, XCircle, Clock, Flame, Download } from "lucide-react";
 
 interface EmailAccount {
   id: string;
@@ -68,6 +68,23 @@ export default function EmailAccountsPage() {
   }
 
   useEffect(() => { load(); }, []);
+
+  function downloadSampleCSV() {
+    const csvContent =
+      "fromName,fromEmail,smtpHost,smtpPort,smtpUser,smtpPass,imapHost,imapPort,imapUser,imapPass,customDomain\n" +
+      "John Sales,john@company.com,smtp.gmail.com,587,john@company.com,app_password_123,imap.gmail.com,993,john@company.com,app_password_123,track.company.com\n" +
+      "Sarah Growth,sarah@outreach.io,smtp.office365.com,587,sarah@outreach.io,secret_pass_456,outlook.office365.com,993,sarah@outreach.io,secret_pass_456,\n" +
+      "Alex Founder,alex@startup.co,mail.startup.co,465,alex@startup.co,secure_pass_789,mail.startup.co,993,alex@startup.co,secure_pass_789,";
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "email_accounts_sample.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 
   async function openWarmupModal(acc: EmailAccount) {
     setWarmupAccount(acc);
@@ -153,12 +170,20 @@ export default function EmailAccountsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Email Accounts</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Manage your SMTP/IMAP sending accounts and email warmup</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={downloadSampleCSV}
+            className="flex items-center gap-1.5 border border-border hover:border-primary/50 text-muted-foreground hover:text-foreground text-xs font-medium px-3.5 py-2.5 rounded-lg transition-all"
+            title="Download sample CSV template with prefilled columns"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Sample CSV
+          </button>
           <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} id="csv-import-input" />
           <button
             onClick={() => fileRef.current?.click()}
