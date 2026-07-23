@@ -1,0 +1,92 @@
+Build a full-stack cold email outreach automation web application. This is the foundation version — every feature listed below must work end-to-end, even if it's basic. No mock data, no fake buttons. Everything must be real and functional.
+
+### Tech Stack
+- Frontend: Next.js 14 (App Router) with TypeScript
+- Styling: Tailwind CSS + shadcn/ui components
+- Backend: Next.js API routes (or Express.js if preferred)
+- Database: PostgreSQL with Prisma ORM
+- Email Sending: Nodemailer (SMTP)
+- Email Receiving: IMAP via imapflow library
+- File Uploads: CSV parsing with papaparse
+- Auth: NextAuth.js with email/password
+
+### Core Screens & Features to Build
+
+#### 1. Authentication
+- Sign up / Login / Logout
+- Session management
+
+#### 2. Dashboard
+- Overview stats: total leads, emails sent, open rate, reply rate, bounce rate
+- List of active campaigns with status indicators
+
+#### 3. Email Accounts (Senders) Management
+- Add email sending accounts via SMTP credentials (host, port, username, password, from name)
+- Add email receiving/reply tracking via IMAP credentials (host, port, username, password)
+- Upload multiple sender accounts via CSV (columns: smtp_host, smtp_port, smtp_user, smtp_pass, imap_host, imap_port, imap_user, imap_pass, from_name, from_email)
+- Test connection button for each account
+- List all connected accounts with status (active/error)
+
+#### 4. Lead Lists
+- Upload leads via CSV file
+- CSV must support columns: email, first_name, last_name, company, title, phone, website, and any custom columns
+- Preview uploaded leads before saving
+- View all lead lists with count
+- View individual leads within a list
+
+#### 5. Campaign Builder
+- Create a new campaign with a name
+- Select which lead list(s) to use
+- Select which sender account(s) to use (support multiple for rotation)
+- Email Sequence Builder:
+  - Step 1: Subject + Body (HTML rich text editor)
+  - Add follow-up steps (Step 2, 3, etc.) with configurable delay in days
+  - Support personalization variables: {{first_name}}, {{last_name}}, {{company}}, {{title}}, {{email}}, and any custom CSV columns
+- Sending Settings:
+  - Daily email limit per sender account
+  - Delay between emails in seconds (min/max range for randomization)
+  - Schedule: select days of week to send (Mon–Fri toggle)
+  - Send window: start time and end time (e.g., 9am–5pm)
+  - Timezone selector
+  - Track opens: yes/no toggle
+  - Track clicks: yes/no toggle
+
+#### 6. Campaign Launch & Control
+- Save campaign as draft
+- Launch campaign (status changes to "Active")
+- Pause / Resume campaign
+- Stop campaign
+
+#### 7. Campaign Analytics (Basic)
+- Per-campaign stats: sent, delivered, opened, clicked, replied, bounced, unsubscribed
+- Per-lead status view (which step they're on, last email sent)
+
+#### 8. Unified Inbox (Basic)
+- Show all replies received across all campaigns in one view
+- Mark reply as: Interested / Not Interested / Meeting Booked / Unsubscribe
+- Reply to leads directly from the inbox
+
+#### 9. Unsubscribe Handling
+- Auto-detect "unsubscribe" keyword in replies and mark lead as unsubscribed
+- Support one-click unsubscribe link in emails via token URL
+- Never email unsubscribed leads again
+
+### Non-Functional Requirements
+- Responsive UI (desktop-first but mobile-friendly)
+- Background job processing for email sending (use a queue: BullMQ + Redis or similar)
+- All operations must be per-user (multi-tenant safe, no data leakage between users)
+- Proper error handling and user-facing error messages
+- Environment variable config for all secrets
+
+
+---
+
+## 🎯 Golden Rules for Every Milestone
+
+1. **Every feature must be functional** — no placeholders, no fake UI, no lorem ipsum
+2. **Multi-tenant from Day 1** — all data is scoped to the user/workspace
+3. **Background jobs for everything async** — email sending, warmup, enrichment all run in queues
+4. **Proper error states** — every action has a loading, success, and error state in the UI
+5. **Mobile responsive** — every screen must work on mobile
+6. **Rate limiting** — protect all API endpoints
+7. **Logging** — log all email events (sent, opened, bounced, replied) with timestamps to the database

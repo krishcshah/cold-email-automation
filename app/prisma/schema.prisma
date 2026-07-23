@@ -1,0 +1,393 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Auth ───────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  emailAccounts      EmailAccount[]
+  leadLists          LeadList[]
+  campaigns          Campaign[]
+  snippets           Snippet[]
+  suppressionEntries SuppressionEntry[]
+}
+
+// ─── Email Accounts ──────────────────────────────────────────────────────────
+
+model EmailAccount {
+  id       String        @id @default(cuid())
+  userId   String
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fromName  String
+  fromEmail String
+
+  // SMTP
+  smtpHost String
+  smtpPort Int
+  smtpUser String
+  smtpPass String  // AES-256 encrypted
+
+  // IMAP
+  imapHost String?
+  imapPort Int?
+  imapUser String?
+  imapPass String?  // AES-256 encrypted
+
+  // Custom Tracking Domain
+  customDomain String?
+
+  status      AccountStatus @default(untested)
+  lastTestedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaignSenders CampaignSender[]
+  emailEvents     EmailEvent[]
+  inboxReplies    InboxReply[]
+  warmupSetting   WarmupSetting?
+  warmupLogs      WarmupLog[]
+}
+
+enum AccountStatus {
+  active
+  error
+  untested
+}
+
+// ─── Lead Lists ───────────────────────────────────────────────────────────────
+
+model LeadList {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  leads             Lead[]
+  campaignLeadLists CampaignLeadList[]
+}
+
+model Lead {
+  id         String    @id @default(cuid())
+  leadListId String
+  leadList   LeadList  @relation(fields: [leadListId], references: [id], onDelete: Cascade)
+
+  email      String
+  firstName  String?
+  lastName   String?
+  company    String?
+  title      String?
+  phone      String?
+  website    String?
+  customFields Json?   // { "any_custom_col": "value" }
+
+  status     LeadStatus @default(active)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  leadCampaignStates LeadCampaignState[]
+  emailEvents        EmailEvent[]
+  inboxReplies       InboxReply[]
+  unsubscribeTokens  UnsubscribeToken[]
+}
+
+enum LeadStatus {
+  active
+  unsubscribed
+  bounced
+  replied
+}
+
+// ─── Campaigns ────────────────────────────────────────────────────────────────
+
+model Campaign {
+  id     String         @id @default(cuid())
+  userId String
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name   String
+  status CampaignStatus @default(draft)
+
+  // Sending settings stored as JSON for flexibility
+  dailyLimit    Int     @default(50)    // per sender account
+  minDelaySecs  Int     @default(60)    // randomized delay between sends
+  maxDelaySecs  Int     @default(180)
+  sendDays      String  @default("1,2,3,4,5") // Mon=1 ... Sun=7, CSV
+  sendStartHour Int     @default(9)
+  sendEndHour   Int     @default(17)
+  timezone      String  @default("UTC")
+  trackOpens    Boolean @default(true)
+  trackClicks   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sequenceSteps      SequenceStep[]
+  campaignLeadLists  CampaignLeadList[]
+  campaignSenders    CampaignSender[]
+  emailEvents        EmailEvent[]
+  leadCampaignStates LeadCampaignState[]
+  inboxReplies       InboxReply[]
+}
+
+enum CampaignStatus {
+  draft
+  active
+  paused
+  stopped
+  completed
+}
+
+model SequenceStep {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  stepNumber  Int
+  subject     String
+  body        String   @db.Text
+  delayDays   Int      @default(0)  // 0 = send immediately (first step)
+
+  // Advanced Branching: "always" | "if_opened" | "if_not_opened" | "if_clicked"
+  condition   String   @default("always")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  variants    SequenceStepVariant[]
+
+  @@unique([campaignId, stepNumber])
+}
+
+model SequenceStepVariant {
+  id         String       @id @default(cuid())
+  stepId     String
+  step       SequenceStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  variantLetter String   @default("A") // "A", "B", etc.
+  subject       String
+  body          String   @db.Text
+  sentCount     Int      @default(0)
+  openCount     Int      @default(0)
+  clickCount    Int      @default(0)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model CampaignLeadList {
+  campaignId String
+  leadListId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  leadList   LeadList @relation(fields: [leadListId], references: [id], onDelete: Cascade)
+
+  @@id([campaignId, leadListId])
+}
+
+model CampaignSender {
+  campaignId     String
+  emailAccountId String
+  campaign       Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  emailAccount   EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+
+  @@id([campaignId, emailAccountId])
+}
+
+// ─── Email Events & State ─────────────────────────────────────────────────────
+
+model LeadCampaignState {
+  id           String     @id @default(cuid())
+  campaignId   String
+  leadId       String
+  campaign     Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  lead         Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  currentStep     Int                @default(1)
+  status          LeadCampaignStatus @default(active)
+  resumeAt        DateTime?          // For OOO auto-pause resume
+  lastEmailSentAt DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@unique([campaignId, leadId])
+}
+
+enum LeadCampaignStatus {
+  active
+  replied
+  unsubscribed
+  bounced
+  completed
+  paused_ooo
+}
+
+model EmailEvent {
+  id             String         @id @default(cuid())
+  campaignId     String
+  leadId         String
+  emailAccountId String
+  stepNumber     Int
+  type           EmailEventType
+  occurredAt     DateTime       @default(now())
+  metadata       Json?          // { url, messageId, ... }
+
+  // Tracking tokens
+  openToken  String? @unique
+  clickToken String? @unique
+
+  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  emailAccount EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+}
+
+enum EmailEventType {
+  sent
+  opened
+  clicked
+  replied
+  bounced
+  unsubscribed
+}
+
+// ─── Inbox ────────────────────────────────────────────────────────────────────
+
+model InboxReply {
+  id             String      @id @default(cuid())
+  campaignId     String
+  leadId         String
+  emailAccountId String
+  subject        String?
+  bodyText       String?     @db.Text
+  bodyHtml       String?     @db.Text
+  receivedAt     DateTime    @default(now())
+  label          InboxLabel  @default(none)
+  isRead         Boolean     @default(false)
+  repliedAt      DateTime?
+  messageId      String?     // the email Message-ID header
+  inReplyTo      String?     // In-Reply-To header for matching
+
+  campaign     Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  emailAccount EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+}
+
+enum InboxLabel {
+  none
+  interested
+  not_interested
+  meeting_booked
+  unsubscribed
+  ooo
+}
+
+// ─── Unsubscribe ──────────────────────────────────────────────────────────────
+
+model UnsubscribeToken {
+  id         String    @id @default(cuid())
+  token      String    @unique @default(cuid())
+  leadId     String
+  campaignId String
+  lead       Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+// ─── Warmup System ────────────────────────────────────────────────────────────
+
+model WarmupSetting {
+  id             String       @id @default(cuid())
+  emailAccountId String       @unique
+  emailAccount   EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+
+  enabled        Boolean  @default(false)
+  dailyLimit     Int      @default(40)       // Target max warmup emails/day
+  rampUpDays     Int      @default(30)       // Days to reach target
+  rampUpCurve    String   @default("linear") // "linear" | "exponential"
+  replyRate      Int      @default(35)       // Target reply % (0-100)
+  importantRate  Int      @default(20)       // % to mark as important
+  spamRescueRate Int      @default(15)       // % to rescue from spam
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WarmupLog {
+  id             String       @id @default(cuid())
+  emailAccountId String
+  emailAccount   EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+
+  peerAccountId String?
+  peerEmail     String?
+  action        WarmupAction
+  status        String       @default("success")
+  occurredAt    DateTime     @default(now())
+}
+
+enum WarmupAction {
+  sent_warmup
+  received_warmup
+  replied_warmup
+  marked_important
+  rescued_from_spam
+}
+
+// ─── Deliverability & Domain Health ─────────────────────────────────────────
+
+model DomainHealth {
+  id          String   @id @default(cuid())
+  domain      String   @unique
+  spfValid    Boolean  @default(false)
+  dkimValid   Boolean  @default(false)
+  dmarcValid  Boolean  @default(false)
+  spfRecord   String?
+  dmarcRecord String?
+  blacklisted Boolean  @default(false)
+  blacklistDetails Json?
+  lastCheckedAt DateTime @default(now())
+}
+
+// ─── Snippets & Suppression ─────────────────────────────────────────────────
+
+model Snippet {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String   // e.g. "calendar_link", "case_study"
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, name])
+}
+
+model SuppressionEntry {
+  id        String          @id @default(cuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      SuppressionType @default(email) // "email" | "domain"
+  value     String          // e.g. "competitor.com" or "john@unwanted.com"
+  reason    String?
+  createdAt DateTime        @default(now())
+
+  @@unique([userId, value])
+}
+
+enum SuppressionType {
+  email
+  domain
+}
