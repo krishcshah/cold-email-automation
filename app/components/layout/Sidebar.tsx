@@ -11,18 +11,24 @@ import {
   Inbox,
   ShieldCheck,
   ShieldAlert,
+  Kanban,
+  PhoneCall,
+  UserCheck,
   LogOut,
   Zap,
 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/crm", label: "CRM Pipeline", icon: Kanban },
+  { href: "/crm/calls", label: "Call Tasks Queue", icon: PhoneCall },
   { href: "/campaigns", label: "Campaigns", icon: Send },
   { href: "/leads", label: "Lead Lists", icon: Users },
   { href: "/email-accounts", label: "Email Accounts", icon: Mail },
   { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/deliverability", label: "Deliverability", icon: ShieldCheck },
   { href: "/suppression", label: "Suppression & Snippets", icon: ShieldAlert },
+  { href: "/team", label: "Team Workspace", icon: UserCheck },
 ];
 
 export default function Sidebar() {
@@ -48,7 +54,7 @@ export default function Sidebar() {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive =
-            pathname === item.href || pathname.startsWith(item.href + "/");
+            pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href + "/"));
           return (
             <Link
               key={item.href}

@@ -2,29 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2, ShieldCheck, Sparkles, Shuffle, Code2, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ShieldCheck, Sparkles, Shuffle } from "lucide-react";
 import { checkSpamScore, SpamCheckResult } from "@/lib/deliverability/spamChecker";
 
 interface SequenceStep {
   subject: string;
   body: string;
   delayDays: number;
+  channel: "email" | "linkedin_connect" | "linkedin_message" | "linkedin_view" | "sms" | "call_task";
   condition: "always" | "if_opened" | "if_not_opened" | "if_clicked";
 }
 
 interface LeadList { id: string; name: string; leadCount: number; }
 interface EmailAccount { id: string; fromEmail: string; fromName: string; }
-interface Snippet { id: string; name: string; content: string; }
 
 const VARIABLES = ["{{first_name}}", "{{last_name}}", "{{email}}", "{{company}}", "{{title}}"];
-
-const TIMEZONES = [
-  "UTC", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
-  "Europe/London", "Europe/Paris", "Europe/Berlin", "Asia/Tokyo", "Asia/Singapore",
-  "Australia/Sydney",
-];
-
-const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function NewCampaignPage() {
   const router = useRouter();
@@ -35,11 +27,10 @@ export default function NewCampaignPage() {
   const [selectedSenders, setSelectedSenders] = useState<string[]>([]);
   const [availableLists, setAvailableLists] = useState<LeadList[]>([]);
   const [availableSenders, setAvailableSenders] = useState<EmailAccount[]>([]);
-  const [availableSnippets, setAvailableSnippets] = useState<Snippet[]>([]);
 
   // Sequence
   const [steps, setSteps] = useState<SequenceStep[]>([
-    { subject: "", body: "", delayDays: 0, condition: "always" },
+    { subject: "", body: "", delayDays: 0, channel: "email", condition: "always" },
   ]);
   const [activeStep, setActiveStep] = useState(0);
 
@@ -56,12 +47,6 @@ export default function NewCampaignPage() {
   const [dailyLimit, setDailyLimit] = useState(50);
   const [minDelay, setMinDelay] = useState(60);
   const [maxDelay, setMaxDelay] = useState(180);
-  const [sendDays, setSendDays] = useState([1, 2, 3, 4, 5]);
-  const [startHour, setStartHour] = useState(9);
-  const [endHour, setEndHour] = useState(17);
-  const [timezone, setTimezone] = useState("UTC");
-  const [trackOpens, setTrackOpens] = useState(true);
-  const [trackClicks, setTrackClicks] = useState(true);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -74,25 +59,25 @@ export default function NewCampaignPage() {
     Promise.all([
       fetch("/api/leads"),
       fetch("/api/email-accounts"),
-      fetch("/api/snippets"),
     ])
-      .then(([lr, er, sr]) => Promise.all([lr.json(), er.json(), sr.json()]))
-      .then(([lists, accounts, snippets]) => {
+      .then(([lr, er]) => Promise.all([lr.json(), er.json()]))
+      .then(([lists, accounts]) => {
         setAvailableLists(lists);
         setAvailableSenders(accounts);
-        setAvailableSnippets(snippets);
       });
   }, []);
 
   useEffect(() => {
     const current = steps[activeStep];
-    if (current) {
+    if (current && current.channel === "email") {
       setSpamCheck(checkSpamScore(current.subject, current.body));
+    } else {
+      setSpamCheck(null);
     }
   }, [steps, activeStep]);
 
   function addStep() {
-    setSteps([...steps, { subject: "", body: "", delayDays: 2, condition: "always" }]);
+    setSteps([...steps, { subject: "", body: "", delayDays: 2, channel: "email", condition: "always" }]);
     setActiveStep(steps.length);
   }
 
@@ -103,7 +88,7 @@ export default function NewCampaignPage() {
     setActiveStep(Math.min(activeStep, newSteps.length - 1));
   }
 
-  function updateStep(i: number, field: keyof SequenceStep, value: string | number) {
+  function updateStep(i: number, field: keyof SequenceStep, value: unknown) {
     setSteps(steps.map((s, idx) => idx === i ? { ...s, [field]: value } : s));
   }
 
@@ -153,16 +138,10 @@ export default function NewCampaignPage() {
     setShowAiModal(false);
   }
 
-  function toggleDay(day: number) {
-    setSendDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
-    );
-  }
-
   async function handleSave(launch = false) {
     if (!name.trim()) { setError("Campaign name is required"); return; }
-    if (steps.some((s) => !s.subject.trim())) { setError("All steps need a subject line"); return; }
-    if (steps.some((s) => !s.body.trim())) { setError("All steps need an email body"); return; }
+    if (steps.some((s) => s.channel === "email" && !s.subject.trim())) { setError("Email steps need a subject line"); return; }
+    if (steps.some((s) => !s.body.trim() && s.channel !== "linkedin_view")) { setError("All message steps need copy/instructions"); return; }
 
     setSaving(true);
     setError("");
@@ -173,8 +152,6 @@ export default function NewCampaignPage() {
       body: JSON.stringify({
         name, leadListIds: selectedLists, senderIds: selectedSenders,
         steps, dailyLimit, minDelaySecs: minDelay, maxDelaySecs: maxDelay,
-        sendDays, sendStartHour: startHour, sendEndHour: endHour,
-        timezone, trackOpens, trackClicks,
       }),
     });
     const data = await res.json();
@@ -209,7 +186,7 @@ export default function NewCampaignPage() {
       {/* Campaign Name */}
       <div className="glass rounded-xl p-5">
         <label className={labelClass}>Campaign Name *</label>
-        <input className={inputClass + " max-w-md"} placeholder="e.g. SaaS Founder Outreach Q1" value={name} onChange={(e) => setName(e.target.value)} id="campaign-name" />
+        <input className={inputClass + " max-w-md"} placeholder="e.g. Multichannel Outreach Campaign Q2" value={name} onChange={(e) => setName(e.target.value)} id="campaign-name" />
       </div>
 
       {/* Lead Lists */}
@@ -238,7 +215,7 @@ export default function NewCampaignPage() {
 
       {/* Sender Accounts */}
       <div className="glass rounded-xl p-5">
-        <h2 className="font-semibold text-foreground mb-3">Sender Accounts <span className="text-xs text-muted-foreground font-normal">(multiple = inbox rotation & ESP matching)</span></h2>
+        <h2 className="font-semibold text-foreground mb-3">Sender Accounts</h2>
         {availableSenders.length === 0 ? (
           <p className="text-muted-foreground text-sm">No sender accounts yet. <a href="/email-accounts" className="text-primary hover:underline">Add one first →</a></p>
         ) : (
@@ -269,7 +246,7 @@ export default function NewCampaignPage() {
               onClick={() => setTab(t)}
               className={`px-4 py-2.5 text-sm font-medium capitalize border-b-2 transition-colors ${tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >
-              {t === "sequence" ? "Email Sequence" : "Sending Settings"}
+              {t === "sequence" ? "Multichannel Sequence" : "Sending Settings"}
             </button>
           ))}
         </div>
@@ -300,9 +277,8 @@ export default function NewCampaignPage() {
                         {i + 1}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{step.subject || `Step ${i + 1}`}</p>
-                        {i > 0 && <p className="text-xs opacity-70">+{step.delayDays}d • {step.condition.replace("if_", "If ")}</p>}
-                        {i === 0 && <p className="text-xs opacity-70">Immediate</p>}
+                        <p className="font-medium truncate">{step.subject || `${step.channel.replace("_", " ").toUpperCase()} Step`}</p>
+                        <p className="text-[10px] opacity-70 uppercase tracking-wider text-primary">{step.channel.replace("_", " ")}</p>
                       </div>
                     </button>
                   ))}
@@ -312,7 +288,7 @@ export default function NewCampaignPage() {
                     onClick={addStep}
                     className="w-full flex items-center gap-2 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
                   >
-                    <Plus className="w-3.5 h-3.5" /> Add Step
+                    <Plus className="w-3.5 h-3.5" /> Add Multichannel Step
                   </button>
                 </div>
               </div>
@@ -328,8 +304,24 @@ export default function NewCampaignPage() {
                   )}
                 </div>
 
-                {activeStep > 0 && (
-                  <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Outreach Channel</label>
+                    <select
+                      value={steps[activeStep].channel}
+                      onChange={(e) => updateStep(activeStep, "channel", e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="email">📧 Cold Email</option>
+                      <option value="linkedin_connect">💼 LinkedIn Connection Request</option>
+                      <option value="linkedin_message">💬 LinkedIn InMail / Message</option>
+                      <option value="linkedin_view">👀 LinkedIn Profile View</option>
+                      <option value="sms">📱 SMS (Twilio Integration)</option>
+                      <option value="call_task">📞 Manual Call Task</option>
+                    </select>
+                  </div>
+
+                  {activeStep > 0 && (
                     <div>
                       <label className={labelClass}>Delay (days after previous step)</label>
                       <input
@@ -341,36 +333,26 @@ export default function NewCampaignPage() {
                         className={inputClass}
                       />
                     </div>
-                    <div>
-                      <label className={labelClass}>Step Condition Branching</label>
-                      <select
-                        value={steps[activeStep].condition}
-                        onChange={(e) => updateStep(activeStep, "condition", e.target.value)}
-                        className={inputClass}
-                      >
-                        <option value="always">Always Send (Default)</option>
-                        <option value="if_opened">If Lead Opened Previous Step</option>
-                        <option value="if_not_opened">If Lead Did NOT Open Previous Step</option>
-                        <option value="if_clicked">If Lead Clicked Link in Previous Step</option>
-                      </select>
-                    </div>
+                  )}
+                </div>
+
+                {steps[activeStep].channel === "email" && (
+                  <div>
+                    <label className={labelClass}>Subject Line *</label>
+                    <input
+                      className={inputClass}
+                      placeholder="e.g. Quick question about {{company}}"
+                      value={steps[activeStep].subject}
+                      onChange={(e) => updateStep(activeStep, "subject", e.target.value)}
+                    />
                   </div>
                 )}
 
                 <div>
-                  <label className={labelClass}>Subject Line *</label>
-                  <input
-                    className={inputClass}
-                    placeholder="e.g. Quick question about {{company}}"
-                    value={steps[activeStep].subject}
-                    onChange={(e) => updateStep(activeStep, "subject", e.target.value)}
-                    id={`step-subject-${activeStep}`}
-                  />
-                </div>
-
-                <div>
                   <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-                    <label className={labelClass + " mb-0"}>Email Body *</label>
+                    <label className={labelClass + " mb-0"}>
+                      {steps[activeStep].channel === "email" ? "Email Body *" : steps[activeStep].channel === "sms" ? "SMS Message Text *" : "Message / Instructions *"}
+                    </label>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <button
                         onClick={convertBodyToSpintax}
@@ -385,44 +367,15 @@ export default function NewCampaignPage() {
                           {v}
                         </button>
                       ))}
-
-                      {/* Reusable Snippets dropdown */}
-                      {availableSnippets.length > 0 && (
-                        <select
-                          onChange={(e) => { if (e.target.value) { insertVariable(`{{snippet:${e.target.value}}}`); e.target.value = ""; } }}
-                          className="text-xs bg-secondary border border-border rounded px-1.5 py-0.5 text-foreground focus:outline-none"
-                        >
-                          <option value="">+ Snippet...</option>
-                          {availableSnippets.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                        </select>
-                      )}
                     </div>
                   </div>
 
-                  {/* Personalized Asset Shortcuts */}
-                  <div className="flex items-center gap-2 mb-2 pt-1 border-t border-border/50">
-                    <span className="text-xs text-muted-foreground">Personalized Assets:</span>
-                    <button
-                      onClick={() => insertVariable('<img src="/api/assets/personalized-image?name={{first_name}}&company={{company}}" width="100%" />')}
-                      className="text-xs text-blue-400 hover:underline flex items-center gap-1"
-                    >
-                      <ImageIcon className="w-3 h-3" /> Custom Image
-                    </button>
-                    <button
-                      onClick={() => insertVariable('<a href="${process.env.NEXT_PUBLIC_APP_URL}/p/{{lead_id}}">View your custom portal</a>')}
-                      className="text-xs text-emerald-400 hover:underline flex items-center gap-1"
-                    >
-                      <Code2 className="w-3 h-3" /> Lead Portal Link
-                    </button>
-                  </div>
-
                   <textarea
-                    rows={10}
+                    rows={8}
                     className={inputClass + " font-mono text-xs resize-y"}
-                    placeholder={`Hi {{first_name}},\n\nI noticed that {{company}} is...\n\nBest,\n[Your name]`}
+                    placeholder={steps[activeStep].channel === "sms" ? "Hi {{first_name}}, following up on my email..." : "Type email or message copy..."}
                     value={steps[activeStep].body}
                     onChange={(e) => updateStep(activeStep, "body", e.target.value)}
-                    id={`step-body-${activeStep}`}
                   />
                 </div>
 
@@ -436,11 +389,6 @@ export default function NewCampaignPage() {
                         {spamCheck.score}/10 ({spamCheck.rating})
                       </span>
                     </div>
-                    {spamCheck.triggers.length > 0 && (
-                      <span className="text-xs text-red-400 font-mono">
-                        {spamCheck.triggers.length} trigger word{spamCheck.triggers.length !== 1 ? "s" : ""} found
-                      </span>
-                    )}
                   </div>
                 )}
               </div>
@@ -457,60 +405,13 @@ export default function NewCampaignPage() {
                 <input type="number" min={1} max={500} value={dailyLimit} onChange={(e) => setDailyLimit(Number(e.target.value))} className={inputClass} />
               </div>
               <div>
-                <label className={labelClass}>Min delay between emails (sec)</label>
+                <label className={labelClass}>Min delay between sends (sec)</label>
                 <input type="number" min={10} value={minDelay} onChange={(e) => setMinDelay(Number(e.target.value))} className={inputClass} />
               </div>
               <div>
-                <label className={labelClass}>Max delay between emails (sec)</label>
+                <label className={labelClass}>Max delay between sends (sec)</label>
                 <input type="number" min={10} value={maxDelay} onChange={(e) => setMaxDelay(Number(e.target.value))} className={inputClass} />
               </div>
-            </div>
-
-            <div>
-              <label className={labelClass}>Send Days</label>
-              <div className="flex gap-2 flex-wrap mt-1">
-                {DAY_LABELS.map((label, i) => {
-                  const day = i + 1;
-                  return (
-                    <button
-                      key={day}
-                      type="button"
-                      onClick={() => toggleDay(day)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${sendDays.includes(day) ? "bg-primary/20 border-primary/40 text-primary" : "bg-secondary border-border text-muted-foreground hover:border-primary/30"}`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className={labelClass}>Send window start (hour, 24h)</label>
-                <input type="number" min={0} max={23} value={startHour} onChange={(e) => setStartHour(Number(e.target.value))} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Send window end (hour, 24h)</label>
-                <input type="number" min={1} max={24} value={endHour} onChange={(e) => setEndHour(Number(e.target.value))} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Timezone</label>
-                <select value={timezone} onChange={(e) => setTimezone(e.target.value)} className={inputClass}>
-                  {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex gap-6">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={trackOpens} onChange={(e) => setTrackOpens(e.target.checked)} className="w-4 h-4 rounded text-primary" />
-                <span className="text-sm text-foreground">Track opens</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={trackClicks} onChange={(e) => setTrackClicks(e.target.checked)} className="w-4 h-4 rounded text-primary" />
-                <span className="text-sm text-foreground">Track clicks</span>
-              </label>
             </div>
           </div>
         )}
@@ -579,18 +480,16 @@ export default function NewCampaignPage() {
         <button
           onClick={() => handleSave(false)}
           disabled={saving}
-          id="save-draft-btn"
-          className="bg-secondary hover:bg-accent border border-border hover:border-primary/30 text-foreground text-sm font-semibold px-5 py-2.5 rounded-lg transition-all disabled:opacity-50"
+          className="bg-secondary hover:bg-accent border border-border text-foreground text-sm font-semibold px-5 py-2.5 rounded-lg transition-all disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save as Draft"}
         </button>
         <button
           onClick={() => handleSave(true)}
           disabled={saving}
-          id="save-launch-btn"
           className="bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold px-5 py-2.5 rounded-lg transition-all disabled:opacity-50"
         >
-          {saving ? "Launching..." : "Save & Launch"}
+          {saving ? "Launching..." : "Save & Launch Multichannel Campaign"}
         </button>
       </div>
     </div>

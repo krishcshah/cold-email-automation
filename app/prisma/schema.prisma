@@ -9,7 +9,7 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─── Auth ───────────────────────────────────────────────────────────────────
+// ─── Auth & Users ───────────────────────────────────────────────────────────
 
 model User {
   id        String   @id @default(cuid())
@@ -24,6 +24,11 @@ model User {
   campaigns          Campaign[]
   snippets           Snippet[]
   suppressionEntries SuppressionEntry[]
+  linkedInAccounts   LinkedInAccount[]
+  twilioAccount      TwilioAccount?
+  contacts           Contact[]
+  tags               Tag[]
+  activityLogs       ActivityLog[]
 }
 
 // ─── Email Accounts ──────────────────────────────────────────────────────────
@@ -106,6 +111,7 @@ model Lead {
   emailEvents        EmailEvent[]
   inboxReplies       InboxReply[]
   unsubscribeTokens  UnsubscribeToken[]
+  contact            Contact?
 }
 
 enum LeadStatus {
@@ -162,6 +168,9 @@ model SequenceStep {
   subject     String
   body        String   @db.Text
   delayDays   Int      @default(0)  // 0 = send immediately (first step)
+
+  // Multichannel: "email" | "linkedin_connect" | "linkedin_message" | "linkedin_view" | "sms" | "call_task"
+  channel     String   @default("email")
 
   // Advanced Branching: "always" | "if_opened" | "if_not_opened" | "if_clicked"
   condition   String   @default("always")
@@ -262,6 +271,9 @@ enum EmailEventType {
   replied
   bounced
   unsubscribed
+  sms_sent
+  linkedin_action
+  call_task
 }
 
 // ─── Inbox ────────────────────────────────────────────────────────────────────
@@ -390,4 +402,147 @@ model SuppressionEntry {
 enum SuppressionType {
   email
   domain
+}
+
+// ─── Multichannel Accounts ───────────────────────────────────────────────────
+
+model LinkedInAccount {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profileName  String
+  profileUrl   String?
+  liAtCookie   String   // Encrypted session cookie
+  dailyLimit   Int      @default(20)
+  sentToday    Int      @default(0)
+  status       String   @default("active")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model TwilioAccount {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountSid  String
+  authToken   String   // Encrypted
+  phoneNumber String
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+}
+
+// ─── Built-in CRM (Contacts, Kanban, Notes, Call Queue) ─────────────────────
+
+enum PipelineStage {
+  new_lead
+  contacted
+  interested
+  meeting_booked
+  closed_won
+  closed_lost
+}
+
+model Contact {
+  id         String        @id @default(cuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leadId     String?       @unique
+  lead       Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  email      String
+  firstName  String?
+  lastName   String?
+  company    String?
+  title      String?
+  phone      String?
+  stage      PipelineStage @default(new_lead)
+  dealValue  Float         @default(0)
+
+  assignedToId String?     // Workspace member name/id
+
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  contactTags ContactTag[]
+  notes       ContactNote[]
+  tasks       ContactTask[]
+  callLogs    CallLog[]
+}
+
+model Tag {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  color     String       @default("#10b981")
+  createdAt DateTime     @default(now())
+
+  contactTags ContactTag[]
+  @@unique([userId, name])
+}
+
+model ContactTag {
+  contactId String
+  tagId     String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([contactId, tagId])
+}
+
+model ContactNote {
+  id         String   @id @default(cuid())
+  contactId  String
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  authorName String
+  content    String   @db.Text
+  createdAt  DateTime @default(now())
+}
+
+model ContactTask {
+  id        String    @id @default(cuid())
+  contactId String
+  contact   Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  title     String
+  dueDate   DateTime?
+  completed Boolean   @default(false)
+  createdAt DateTime  @default(now())
+}
+
+model CallLog {
+  id           String   @id @default(cuid())
+  contactId    String
+  contact      Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  outcome      String   // "connected" | "voicemail" | "no_answer"
+  notes        String?  @db.Text
+  loggedByName String
+  createdAt    DateTime @default(now())
+}
+
+// ─── Team Collaboration ──────────────────────────────────────────────────────
+
+enum WorkspaceRole {
+  admin
+  member
+  viewer
+}
+
+model WorkspaceMember {
+  id        String        @id @default(cuid())
+  ownerId   String        // Workspace owner User ID
+  email     String
+  name      String?
+  role      WorkspaceRole @default(member)
+  status    String        @default("invited")
+  createdAt DateTime      @default(now())
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String   // Workspace owner
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actorName String
+  action    String   // e.g. "Moved deal to Closed Won", "Logged call with John"
+  target    String?
+  createdAt DateTime @default(now())
 }

@@ -73,9 +73,11 @@ export async function POST(req: NextRequest) {
 
           if (!matchingState) continue;
 
+          const lead = matchingState.lead;
+
           const existing = await prisma.inboxReply.findFirst({
             where: {
-              leadId: matchingState.leadId,
+              leadId: lead.id,
               campaignId: campaign.id,
               messageId: email.messageId,
             },
@@ -91,7 +93,7 @@ export async function POST(req: NextRequest) {
           await prisma.inboxReply.create({
             data: {
               campaignId: campaign.id,
-              leadId: matchingState.leadId,
+              leadId: lead.id,
               emailAccountId: account.id,
               subject: email.subject ?? null,
               bodyText: bodyStr || null,
@@ -102,18 +104,17 @@ export async function POST(req: NextRequest) {
             },
           });
 
-          // Handle state updates
+          // Handle state updates & Auto-Contact CRM Conversion
           if (isUnsub) {
             await prisma.leadCampaignState.update({
               where: { id: matchingState.id },
               data: { status: "unsubscribed" },
             });
             await prisma.lead.update({
-              where: { id: matchingState.leadId },
+              where: { id: lead.id },
               data: { status: "unsubscribed" },
             });
           } else if (isOoo) {
-            // Auto-pause OOO leads for 7 days
             const resumeDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
             await prisma.leadCampaignState.update({
               where: { id: matchingState.id },
@@ -124,12 +125,41 @@ export async function POST(req: NextRequest) {
               where: { id: matchingState.id },
               data: { status: "replied" },
             });
+
+            // Automatically convert lead into CRM Contact when they reply!
+            await prisma.contact.upsert({
+              where: { leadId: lead.id },
+              create: {
+                userId: campaign.userId,
+                leadId: lead.id,
+                email: lead.email,
+                firstName: lead.firstName,
+                lastName: lead.lastName,
+                company: lead.company,
+                title: lead.title,
+                phone: lead.phone,
+                stage: "interested",
+                dealValue: 1000,
+              },
+              update: {
+                stage: "interested",
+              },
+            });
+
+            await prisma.activityLog.create({
+              data: {
+                userId: campaign.userId,
+                actorName: "System",
+                action: `Auto-converted lead ${lead.firstName || lead.email} to Interested Contact upon reply`,
+                target: lead.id,
+              },
+            });
           }
 
           await prisma.emailEvent.create({
             data: {
               campaignId: campaign.id,
-              leadId: matchingState.leadId,
+              leadId: lead.id,
               emailAccountId: account.id,
               stepNumber: matchingState.currentStep,
               type: isUnsub ? "unsubscribed" : "replied",
