@@ -19,16 +19,20 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  emailAccounts      EmailAccount[]
-  leadLists          LeadList[]
-  campaigns          Campaign[]
-  snippets           Snippet[]
-  suppressionEntries SuppressionEntry[]
-  linkedInAccounts   LinkedInAccount[]
-  twilioAccount      TwilioAccount?
-  contacts           Contact[]
-  tags               Tag[]
-  activityLogs       ActivityLog[]
+  emailAccounts        EmailAccount[]
+  leadLists            LeadList[]
+  campaigns            Campaign[]
+  snippets             Snippet[]
+  suppressionEntries   SuppressionEntry[]
+  linkedInAccounts     LinkedInAccount[]
+  twilioAccount        TwilioAccount?
+  contacts             Contact[]
+  tags                 Tag[]
+  activityLogs         ActivityLog[]
+  prospectSearchLogs   ProspectSearchLog[]
+  apiKeys              ApiKey[]
+  webhookSubscriptions WebhookSubscription[]
+  integrationSettings  IntegrationSetting[]
 }
 
 // ─── Email Accounts ──────────────────────────────────────────────────────────
@@ -545,4 +549,55 @@ model ActivityLog {
   action    String   // e.g. "Moved deal to Closed Won", "Logged call with John"
   target    String?
   createdAt DateTime @default(now())
+}
+
+// ─── Prospecting & Enrichment ─────────────────────────────────────────────
+
+model ProspectSearchLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  query     Json
+  results   Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+// ─── API Keys & Webhook Dispatcher ──────────────────────────────────────────
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  key        String    @unique
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+model WebhookSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url       String
+  events    String   // CSV e.g. "email.sent,email.replied,meeting.booked"
+  secret    String
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+}
+
+// ─── Native Integrations Settings ──────────────────────────────────────────
+
+model IntegrationSetting {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    String   // "hubspot" | "pipedrive" | "salesforce" | "slack" | "sheets"
+  apiKey      String?
+  accessToken String?
+  config      Json?
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, provider])
 }
